@@ -1,0 +1,85 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-provider
+  namespace: monitoring
+data:
+  dashboards.yaml: |
+    apiVersion: 1
+    providers:
+      - name: default
+        orgId: 1
+        folder: ""
+        type: file
+        disableDeletion: false
+        updateIntervalSeconds: 10
+        allowUiUpdates: true
+        options:
+          path: /var/lib/grafana/dashboards
+          foldersFromFilesStructure: false
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-model-server
+  namespace: monitoring
+data:
+  model-server.json: |
+    {
+      "title": "RollbackOps - Model Server",
+      "uid": "rollbackops-model-server",
+      "schemaVersion": 39,
+      "version": 1,
+      "editable": true,
+      "timezone": "browser",
+      "refresh": "10s",
+      "time": {"from": "now-30m", "to": "now"},
+      "panels": [
+        {
+          "id": 1,
+          "type": "timeseries",
+          "title": "Prediction request rate",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+          "fieldConfig": {"defaults": {"unit": "reqps"}, "overrides": []},
+          "targets": [
+            {"refId": "A", "expr": "sum by (version) (rate(model_predictions_total[1m]))", "legendFormat": "{{version}}"}
+          ]
+        },
+        {
+          "id": 2,
+          "type": "timeseries",
+          "title": "Prediction latency (p50/p95/p99)",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+          "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []},
+          "targets": [
+            {"refId": "A", "expr": "histogram_quantile(0.50, sum by (le) (rate(model_prediction_latency_seconds_bucket[5m])))", "legendFormat": "p50"},
+            {"refId": "B", "expr": "histogram_quantile(0.95, sum by (le) (rate(model_prediction_latency_seconds_bucket[5m])))", "legendFormat": "p95"},
+            {"refId": "C", "expr": "histogram_quantile(0.99, sum by (le) (rate(model_prediction_latency_seconds_bucket[5m])))", "legendFormat": "p99"}
+          ]
+        },
+        {
+          "id": 3,
+          "type": "timeseries",
+          "title": "Error ratio",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+          "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1}, "overrides": []},
+          "targets": [
+            {"refId": "A", "expr": "sum(rate(model_predictions_total{status=\"error\"}[5m])) / sum(rate(model_predictions_total[5m]))", "legendFormat": "error ratio"}
+          ]
+        },
+        {
+          "id": 4,
+          "type": "bargauge",
+          "title": "Score distribution (5m)",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+          "options": {"orientation": "horizontal", "displayMode": "gradient"},
+          "targets": [
+            {"refId": "A", "expr": "sum by (le) (increase(model_prediction_score_distribution_bucket[5m]))", "legendFormat": "le={{le}}", "instant": true}
+          ]
+        }
+      ]
+    }

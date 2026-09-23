@@ -41,3 +41,32 @@ kind load docker-image model-server:local
 kubectl apply -f services/model-server/k8s/
 kubectl port-forward svc/model-server 8080:80
 ```
+
+## Phase 2: Local cluster & observability
+
+Prerequisites: Docker Desktop (running), `kind`, and `kubectl` on PATH.
+
+```bash
+./scripts/deploy_local.sh
+```
+
+This creates the `rollbackops` kind cluster (with host ports 30000/30001 mapped),
+builds `model-server:local` if missing, tags it as the manifest image
+(`ghcr.io/danial-umer710/rollbackops/model-server:v1.0.0`) and
+`kind load`s it — because the Deployment uses `imagePullPolicy: IfNotPresent`,
+loading under that exact ref means Kubernetes never tries to pull from ghcr.
+It then deploys the model server plus a Prometheus + Grafana stack in the
+`monitoring` namespace and runs `scripts/verify_scrape.sh` to confirm metrics
+are being scraped.
+
+Endpoints:
+
+- Grafana: http://localhost:30000 (admin/admin, anonymous Viewer enabled)
+  with a provisioned "RollbackOps - Model Server" dashboard
+- Prometheus: http://localhost:30001
+
+Teardown:
+
+```bash
+kind delete cluster --name rollbackops
+```
