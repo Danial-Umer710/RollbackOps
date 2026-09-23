@@ -129,3 +129,8 @@ Restore the canary afterwards:
 kubectl -n default annotate ingress model-server-canary \
   nginx.ingress.kubernetes.io/canary-weight=10 --overwrite
 ```
+
+## Infrastructure (OpenTofu + Terragrunt)
+
+AWS IaC lives in `infra/` — see `infra/README.md` (VPC, EKS, ECR, IRSA,
+GitHub OIDC; mock-mode `terragrunt plan` works without credentials).

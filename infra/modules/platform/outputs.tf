@@ -29,3 +29,27 @@ output "ecr_repository_urls" {
 output "kubeconfig_command" {
   value = "aws eks update-kubeconfig --region ${var.region} --name ${module.eks.cluster_name}"
 }
+
+output "vpc_id" {
+  value = module.vpc.vpc_id
+}
+
+output "public_subnet_ids" {
+  value = module.vpc.public_subnet_ids
+}
+
+output "private_subnet_ids" {
+  value = module.vpc.private_subnet_ids
+}
+
+output "rollback_controller_irsa_role_arn" {
+  value = module.rollback_controller_irsa.role_arn
+}
+
+output "rollback_controller_sa_annotation" {
+  value = module.rollback_controller_irsa.service_account_annotation
+}
+
+output "github_actions_role_arn" {
+  value = var.github_oidc_enabled ? module.github_oidc[0].role_arn : null
+}

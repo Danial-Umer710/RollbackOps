@@ -16,6 +16,20 @@ module "iam" {
   tags        = local.tags
 }
 
+module "vpc" {
+  source = "../vpc"
+
+  name                 = var.cluster_name
+  cluster_name         = var.cluster_name
+  cidr_block           = var.vpc_cidr
+  availability_zones   = var.availability_zones
+  public_subnet_cidrs  = var.public_subnet_cidrs
+  private_subnet_cidrs = var.private_subnet_cidrs
+  single_nat_gateway   = var.single_nat_gateway
+
+  tags = local.tags
+}
+
 module "eks" {
   source = "../eks"
 
@@ -24,8 +38,9 @@ module "eks" {
   cluster_role_arn   = module.iam.cluster_role_arn
   node_role_arn      = module.iam.node_role_arn
 
-  vpc_id                 = var.vpc_id
-  subnet_ids             = var.subnet_ids
+  # Control-plane ENIs and nodes both land on the private subnets
+  subnet_ids             = module.vpc.private_subnet_ids
+  node_subnet_ids        = module.vpc.private_subnet_ids
   endpoint_public_access = var.endpoint_public_access
   public_access_cidrs    = var.public_access_cidrs
 
@@ -47,4 +62,29 @@ module "ecr" {
   force_delete      = var.ecr_force_delete
   max_tagged_images = var.ecr_max_tagged_images
   tags              = local.tags
+}
+
+module "rollback_controller_irsa" {
+  source = "../iam-irsa"
+
+  role_name            = "${var.cluster_name}-rollback-controller"
+  oidc_provider_arn    = module.eks.oidc_provider_arn
+  oidc_issuer_url      = module.eks.oidc_issuer_url
+  namespace            = var.rollback_controller_namespace
+  service_account_name = var.rollback_controller_service_account
+  # Baseline read-only policy to prove IRSA; replace with a scoped policy
+  # when the controller needs real AWS access.
+  policy_arns = ["arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"]
+
+  tags = local.tags
+}
+
+module "github_oidc" {
+  source = "../iam-github-oidc"
+  count  = var.github_oidc_enabled ? 1 : 0
+
+  github_repository   = var.github_repository
+  ecr_repository_arns = [for r in module.ecr : r.repository_arn]
+
+  tags = local.tags
 }

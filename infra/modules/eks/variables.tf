@@ -15,12 +15,14 @@ variable "node_role_arn" {
   type = string
 }
 
-variable "vpc_id" {
-  type = string
-}
-
 variable "subnet_ids" {
   type = list(string)
+}
+
+variable "node_subnet_ids" {
+  description = "Subnets for the node group; defaults to subnet_ids when null"
+  type        = list(string)
+  default     = null
 }
 
 variable "endpoint_public_access" {

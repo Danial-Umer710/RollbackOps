@@ -24,7 +24,7 @@ resource "aws_eks_node_group" "default" {
   cluster_name    = aws_eks_cluster.this.name
   node_group_name = "${var.cluster_name}-default"
   node_role_arn   = var.node_role_arn
-  subnet_ids      = var.subnet_ids
+  subnet_ids      = var.node_subnet_ids != null ? var.node_subnet_ids : var.subnet_ids
 
   scaling_config {
     min_size     = var.node_min_size

@@ -15,12 +15,47 @@ variable "kubernetes_version" {
   default = "1.31"
 }
 
-variable "vpc_id" {
-  type = string
+variable "vpc_cidr" {
+  type    = string
+  default = "10.0.0.0/16"
 }
 
-variable "subnet_ids" {
+variable "availability_zones" {
   type = list(string)
+}
+
+variable "public_subnet_cidrs" {
+  type = list(string)
+}
+
+variable "private_subnet_cidrs" {
+  type = list(string)
+}
+
+variable "single_nat_gateway" {
+  type    = bool
+  default = false
+}
+
+variable "github_repository" {
+  type    = string
+  default = "Danial-Umer710/RollbackOps"
+}
+
+variable "github_oidc_enabled" {
+  description = "Create the GitHub Actions OIDC provider + ECR push role (one provider per AWS account)"
+  type        = bool
+  default     = false
+}
+
+variable "rollback_controller_namespace" {
+  type    = string
+  default = "default"
+}
+
+variable "rollback_controller_service_account" {
+  type    = string
+  default = "rollback-controller"
 }
 
 variable "endpoint_public_access" {
