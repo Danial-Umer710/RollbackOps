@@ -28,6 +28,38 @@ jobs:
         run: python -m pytest -q
         working-directory: services/${{ matrix.service }}
 
+  iac:
+    runs-on: ubuntu-latest
+    env:
+      ROLLBACKOPS_MOCK_AWS: "true"
+      TG_NON_INTERACTIVE: "true"
+      TG_VERSION: "v1.1.1"
+    strategy:
+      matrix:
+        env: [staging, production]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: "1.12.6"
+      - name: Install Terragrunt
+        run: |
+          curl -sSfL "https://github.com/gruntwork-io/terragrunt/releases/download/${TG_VERSION}/terragrunt_linux_amd64" \
+            -o /usr/local/bin/terragrunt
+          chmod +x /usr/local/bin/terragrunt
+          terragrunt --version
+      - name: tofu fmt check
+        run: tofu fmt -check -recursive infra/
+      - name: terragrunt init
+        run: terragrunt init -input=false
+        working-directory: infra/environments/${{ matrix.env }}
+      - name: terragrunt validate
+        run: terragrunt validate
+        working-directory: infra/environments/${{ matrix.env }}
+      - name: terragrunt plan
+        run: terragrunt plan -input=false -lock=false
+        working-directory: infra/environments/${{ matrix.env }}
+
   build-and-scan:
     needs: test
     runs-on: ubuntu-latest

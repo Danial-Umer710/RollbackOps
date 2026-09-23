@@ -3,3 +3,10 @@ __pycache__/
 .venv/
 *.pyc
 k8s/rollback-controller/secret.yaml
+.terragrunt-cache/
+.terragrunt-local-state/
+*.tfstate
+*.tfstate.*
+.terraform/
+*.tfplan
+crash.log
