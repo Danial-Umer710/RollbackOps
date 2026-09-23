@@ -42,7 +42,7 @@ kubectl apply -f services/model-server/k8s/
 kubectl port-forward svc/model-server 8080:80
 ```
 
-## Phase 2: Local cluster & observability
+## Local cluster & observability
 
 Prerequisites: Docker Desktop (running), `kind`, and `kubectl` on PATH.
 
@@ -50,20 +50,43 @@ Prerequisites: Docker Desktop (running), `kind`, and `kubectl` on PATH.
 ./scripts/deploy_local.sh
 ```
 
-This creates the `rollbackops` kind cluster (with host ports 30000/30001 mapped),
-builds `model-server:local` if missing, tags it as the manifest image
-(`ghcr.io/danial-umer710/rollbackops/model-server:v1.0.0`) and
-`kind load`s it — because the Deployment uses `imagePullPolicy: IfNotPresent`,
-loading under that exact ref means Kubernetes never tries to pull from ghcr.
-It then deploys the model server plus a Prometheus + Grafana stack in the
-`monitoring` namespace and runs `scripts/verify_scrape.sh` to confirm metrics
-are being scraped.
+This creates the `rollbackops` kind cluster (with host ports 30000/30001/30002
+mapped), builds `model-server:local` and `drift-detector:local` if missing, tags
+them as the manifest image refs and `kind load`s them — because the Deployments
+use `imagePullPolicy: IfNotPresent`, loading under those exact refs means
+Kubernetes never tries to pull from ghcr. It then deploys:
+
+- `model-stable` (2 replicas, `version=v1.0.0`) and `model-candidate`
+  (1 replica, `version=v1.1.0-candidate`, ClusterIP `model-candidate`)
+- `drift-detector` — emits `model_drift_score`; `POST /inject-drift` and
+  `POST /reset-drift` simulate drift
+- monitoring stack in `monitoring`: Prometheus (with the `ModelDriftDetected`
+  rule), Alertmanager (routes to `webhook-sink`, a stand-in for the future
+  rollback CI trigger), Grafana
+
+and finishes by running `scripts/verify_scrape.sh` to confirm scraping.
 
 Endpoints:
 
 - Grafana: http://localhost:30000 (admin/admin, anonymous Viewer enabled)
   with a provisioned "RollbackOps - Model Server" dashboard
 - Prometheus: http://localhost:30001
+- Alertmanager: http://localhost:30002
+
+End-to-end drift alert check (inject drift -> Prometheus fires -> Alertmanager
+-> webhook-sink logs it -> reset):
+
+```bash
+./scripts/verify_drift_alert.sh
+```
+
+Note: `k8s/kind-config.yaml` port mappings are baked into the cluster at
+creation time — after changing them you must recreate the cluster:
+
+```bash
+kind delete cluster --name rollbackops
+./scripts/deploy_local.sh
+```
 
 Teardown:
 

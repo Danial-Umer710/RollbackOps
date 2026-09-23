@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-rules
+  namespace: monitoring
+data:
+  drift-rules.yaml: |
+    groups:
+      - name: model-drift
+        rules:
+          - alert: ModelDriftDetected
+            expr: model_drift_score{job="drift-detector"} > 0.6
+            for: 1m
+            labels:
+              severity: critical
+              action: rollback
+            annotations:
+              summary: "Data drift detected for model {{ $labels.model_version }}"
+              description: "model_drift_score is {{ $value | printf \"%.2f\" }} (threshold 0.6) for over 1m. Rollback candidate {{ $labels.model_version }}."

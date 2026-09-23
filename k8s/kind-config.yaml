@@ -10,3 +10,6 @@ nodes:
       - containerPort: 30001   # Prometheus
         hostPort: 30001
         protocol: TCP
+      - containerPort: 30002   # Alertmanager
+        hostPort: 30002
+        protocol: TCP

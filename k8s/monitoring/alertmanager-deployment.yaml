@@ -1,41 +1,38 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: prometheus
+  name: alertmanager
   namespace: monitoring
   labels:
-    app: prometheus
+    app: alertmanager
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: prometheus
+      app: alertmanager
   template:
     metadata:
       labels:
-        app: prometheus
+        app: alertmanager
     spec:
-      serviceAccountName: prometheus
       securityContext:
         fsGroup: 65534
       containers:
-        - name: prometheus
-          image: prom/prometheus:v3.5.0
+        - name: alertmanager
+          image: prom/alertmanager:v0.28.1
           args:
-            - --config.file=/etc/prometheus/prometheus.yml
-            - --storage.tsdb.path=/prometheus
-            - --storage.tsdb.retention.time=2d
-            - --web.enable-lifecycle
+            - --config.file=/etc/alertmanager/alertmanager.yml
+            - --storage.path=/alertmanager
           ports:
-            - containerPort: 9090
+            - containerPort: 9093
               name: http
           resources:
             requests:
-              cpu: 100m
-              memory: 256Mi
+              cpu: 50m
+              memory: 64Mi
             limits:
-              cpu: 500m
-              memory: 512Mi
+              cpu: 200m
+              memory: 128Mi
           readinessProbe:
             httpGet:
               path: /-/ready
@@ -54,17 +51,12 @@ spec:
             allowPrivilegeEscalation: false
           volumeMounts:
             - name: config
-              mountPath: /etc/prometheus
-            - name: rules
-              mountPath: /etc/prometheus/rules
+              mountPath: /etc/alertmanager
             - name: storage
-              mountPath: /prometheus
+              mountPath: /alertmanager
       volumes:
         - name: config
           configMap:
-            name: prometheus-config
-        - name: rules
-          configMap:
-            name: prometheus-rules
+            name: alertmanager-config
         - name: storage
           emptyDir: {}

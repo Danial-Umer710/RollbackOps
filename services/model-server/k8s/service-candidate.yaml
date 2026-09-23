@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: model-candidate
+  labels:
+    app: model-server
+    track: candidate
+spec:
+  type: ClusterIP
+  selector:
+    app: model-server
+    track: candidate
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

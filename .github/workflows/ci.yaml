@@ -11,37 +11,43 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [model-server, drift-detector]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: pip
-          cache-dependency-path: services/model-server/requirements-dev.txt
+          cache-dependency-path: services/${{ matrix.service }}/requirements-dev.txt
       - name: Install dependencies
         run: pip install -r requirements-dev.txt
-        working-directory: services/model-server
+        working-directory: services/${{ matrix.service }}
       - name: Run tests
         run: python -m pytest -q
-        working-directory: services/model-server
+        working-directory: services/${{ matrix.service }}
 
   build-and-scan:
     needs: test
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [model-server, drift-detector]
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
       - name: Build image
         uses: docker/build-push-action@v6
         with:
-          context: services/model-server
+          context: services/${{ matrix.service }}
           push: false
           load: true
-          tags: model-server:${{ github.sha }}
+          tags: ${{ matrix.service }}:${{ github.sha }}
       - name: Scan image with Trivy
         uses: aquasecurity/trivy-action@0.28.0
         with:
-          image-ref: model-server:${{ github.sha }}
+          image-ref: ${{ matrix.service }}:${{ github.sha }}
           format: table
           exit-code: "1"
           ignore-unfixed: true
