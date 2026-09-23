@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: rollback-controller
+  namespace: default
+  labels:
+    app: rollback-controller
+spec:
+  type: ClusterIP
+  selector:
+    app: rollback-controller
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

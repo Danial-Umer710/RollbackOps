@@ -93,3 +93,39 @@ Teardown:
 ```bash
 kind delete cluster --name rollbackops
 ```
+
+## Phase 4: Automated canary rollback
+
+Architecture: `drift-detector` emits `model_drift_score` → Prometheus rule
+`ModelDriftDetected` (>0.6 for 1m) → Alertmanager →
+`rollback-controller` (`/webhook`) patches the `model-server-canary` Ingress
+`canary-weight` to `0` and fires a GitHub `repository_dispatch`
+(`drift_rollback_triggered`) → `.github/workflows/audit.yaml` records the audit.
+Alertmanager also mirrors every alert to `webhook-sink` for visibility.
+
+Traffic reaches the models through ingress-nginx at http://localhost:8080
+(kind maps host 8080/8443 -> node 80/443). The canary Ingress sends
+`canary-weight: 10`% of `/` traffic to `model-candidate` (`v1.1.0-candidate`);
+the rest goes to `model-stable` (`v1.0.0`).
+
+GitHub token (optional): deploy with `export GITHUB_TOKEN=<fine-grained PAT>`
+(needs **Contents: read & write** on the repo for `repository_dispatch`). The
+deploy script creates the `github-token` Secret from it. Without a token the
+rollback still executes; only the audit dispatch is skipped.
+
+```bash
+export GITHUB_TOKEN=...   # optional
+./scripts/deploy_local.sh
+./scripts/verify_rollback.sh
+```
+
+`verify_rollback.sh` restores weight 10, proves a mixed-traffic split, injects
+drift, waits for the controller to patch the weight to 0, confirms 100% stable
+traffic, then resets drift.
+
+Restore the canary afterwards:
+
+```bash
+kubectl -n default annotate ingress model-server-canary \
+  nginx.ingress.kubernetes.io/canary-weight=10 --overwrite
+```

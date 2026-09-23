@@ -16,5 +16,7 @@ data:
     receivers:
       - name: rollback-webhook
         webhook_configs:
+          - url: http://rollback-controller.default.svc.cluster.local:8080/webhook
+            send_resolved: false
           - url: http://webhook-sink.monitoring.svc.cluster.local:8080/alert
             send_resolved: true

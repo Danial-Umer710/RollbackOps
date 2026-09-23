@@ -3,13 +3,25 @@ apiVersion: kind.x-k8s.io/v1alpha4
 name: rollbackops
 nodes:
   - role: control-plane
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "ingress-ready=true"
     extraPortMappings:
-      - containerPort: 30000   # Grafana
+      - containerPort: 80     # ingress-nginx HTTP
+        hostPort: 8080
+        protocol: TCP
+      - containerPort: 443    # ingress-nginx HTTPS
+        hostPort: 8443
+        protocol: TCP
+      - containerPort: 30000  # Grafana
         hostPort: 30000
         protocol: TCP
-      - containerPort: 30001   # Prometheus
+      - containerPort: 30001  # Prometheus
         hostPort: 30001
         protocol: TCP
-      - containerPort: 30002   # Alertmanager
+      - containerPort: 30002  # Alertmanager
         hostPort: 30002
         protocol: TCP

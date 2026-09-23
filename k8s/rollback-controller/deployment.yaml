@@ -1,0 +1,73 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rollback-controller
+  namespace: default
+  labels:
+    app: rollback-controller
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rollback-controller
+  template:
+    metadata:
+      labels:
+        app: rollback-controller
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: rollback-controller
+      automountServiceAccountToken: true
+      containers:
+        - name: rollback-controller
+          image: ghcr.io/danial-umer710/rollbackops/rollback-controller:v0.1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: TARGET_NAMESPACE
+              value: "default"
+            - name: CANARY_INGRESS_NAME
+              value: "model-server-canary"
+            - name: GITHUB_REPO
+              value: "Danial-Umer710/RollbackOps"
+            - name: CLUSTER_NAME
+              value: "kind-rollbackops"
+            - name: GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: github-token
+                  key: token
+                  optional: true
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL

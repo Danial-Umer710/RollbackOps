@@ -1,0 +1,49 @@
+name: Drift Rollback Audit
+
+on:
+  repository_dispatch:
+    types: [drift_rollback_triggered]
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    env:
+      MODEL_VERSION: ${{ github.event.client_payload.model_version }}
+      ROLLBACK_RESULT: ${{ github.event.client_payload.rollback_result }}
+      PREVIOUS_WEIGHT: ${{ github.event.client_payload.previous_weight }}
+      CLUSTER: ${{ github.event.client_payload.cluster }}
+      INGRESS: ${{ github.event.client_payload.ingress }}
+      TRIGGERED_AT: ${{ github.event.client_payload.triggered_at }}
+      SUMMARY: ${{ github.event.client_payload.summary }}
+      PAYLOAD_JSON: ${{ toJSON(github.event.client_payload) }}
+    steps:
+      - name: Record audit event
+        run: |
+          echo "AUDIT: drift rollback executed"
+          echo "  model_version:    $MODEL_VERSION"
+          echo "  rollback_result:  $ROLLBACK_RESULT"
+          echo "  previous_weight:  $PREVIOUS_WEIGHT"
+          echo "  cluster:          $CLUSTER"
+          echo "  ingress:          $INGRESS"
+          echo "  triggered_at:     $TRIGGERED_AT"
+          echo "  summary:          $SUMMARY"
+          echo "full client_payload:"
+          echo "$PAYLOAD_JSON"
+      - name: Write step summary
+        run: |
+          {
+            echo "### Drift Rollback Audit"
+            echo
+            echo "| field | value |"
+            echo "|---|---|"
+            echo "| model_version | $MODEL_VERSION |"
+            echo "| rollback_result | $ROLLBACK_RESULT |"
+            echo "| previous_weight | $PREVIOUS_WEIGHT |"
+            echo "| cluster | $CLUSTER |"
+            echo "| ingress | $INGRESS |"
+            echo "| triggered_at | $TRIGGERED_AT |"
+            echo "| summary | $SUMMARY |"
+          } >> "$GITHUB_STEP_SUMMARY"
