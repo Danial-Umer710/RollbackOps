@@ -1,0 +1,10 @@
+# Annotates the rollback-controller ServiceAccount with its IRSA role.
+# The role name matches infra/modules/platform: "${cluster_name}-rollback-controller";
+# the exact ARN comes from the `rollback_controller_irsa_role_arn` output.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: rollback-controller
+  namespace: default
+  annotations:
+    eks.amazonaws.com/role-arn: "arn:aws:iam::ACCOUNT_ID:role/rollbackops-staging-rollback-controller"

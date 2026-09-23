@@ -33,12 +33,28 @@ docker build -t model-server:local services/model-server
 docker run --rm -p 8000:8000 model-server:local
 ```
 
+## Kubernetes manifests (Kustomize)
+
+Manifests live under `k8s/`: `k8s/base/` contains the environment-agnostic
+resources (per-component subdirs), and `k8s/overlays/` holds environment
+customizations:
+
+- `k8s/overlays/local` — kind: rewrites images to `<service>:local` and
+  re-adds the monitoring NodePorts (Grafana 30000, Prometheus 30001,
+  Alertmanager 30002).
+- `k8s/overlays/staging` — AWS/EKS: ECR image refs (set by CI via
+  `kustomize edit set image`), IRSA annotation for rollback-controller,
+  ALB Ingress with weighted-routing (replaces the nginx canary Ingress).
+
+Render without applying: `kubectl kustomize k8s/overlays/local`
+(or `.../staging`).
+
 ## Kubernetes (kind)
 
 ```bash
 kind create cluster
 kind load docker-image model-server:local
-kubectl apply -f services/model-server/k8s/
+kubectl apply -k k8s/overlays/local
 kubectl port-forward svc/model-server 8080:80
 ```
 
@@ -50,11 +66,12 @@ Prerequisites: Docker Desktop (running), `kind`, and `kubectl` on PATH.
 ./scripts/deploy_local.sh
 ```
 
-This creates the `rollbackops` kind cluster (with host ports 30000/30001/30002
-mapped), builds `model-server:local` and `drift-detector:local` if missing, tags
-them as the manifest image refs and `kind load`s them — because the Deployments
-use `imagePullPolicy: IfNotPresent`, loading under those exact refs means
-Kubernetes never tries to pull from ghcr. It then deploys:
+This creates the `rollbackops` kind cluster (with host ports 8080/8443 and
+30000/30001/30002 mapped), builds `model-server:local`, `drift-detector:local`
+and `rollback-controller:local` if missing, `kind load`s them (the local
+overlay points the Deployments at those tags and `imagePullPolicy:
+IfNotPresent` means no pull is attempted), and `kubectl apply -k`s
+`k8s/overlays/local`. It then deploys:
 
 - `model-stable` (2 replicas, `version=v1.0.0`) and `model-candidate`
   (1 replica, `version=v1.1.0-candidate`, ClusterIP `model-candidate`)

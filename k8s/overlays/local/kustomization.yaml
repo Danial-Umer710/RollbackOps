@@ -1,0 +1,19 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+
+images:
+  - name: ghcr.io/danial-umer710/rollbackops/model-server
+    newName: model-server
+    newTag: local
+  - name: ghcr.io/danial-umer710/rollbackops/drift-detector
+    newName: drift-detector
+    newTag: local
+  - name: ghcr.io/danial-umer710/rollbackops/rollback-controller
+    newName: rollback-controller
+    newTag: local
+
+patches:
+  - path: monitoring-nodeport-patch.yaml

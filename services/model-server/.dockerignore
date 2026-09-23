@@ -1,7 +1,6 @@
 tests
 .venv
 __pycache__
-k8s
 .git
 .pytest_cache
 *.pyc

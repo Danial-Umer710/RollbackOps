@@ -1,0 +1,30 @@
+# Requires the AWS Load Balancer Controller installed on the cluster.
+# Note: the rollback-controller currently patches nginx's canary-weight
+# annotation; on ALB the rollback strategy must instead rewrite the
+# actions.weighted-routing weights — tracked as a follow-up.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: model-server
+  namespace: default
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/healthcheck-path: /healthz
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+    alb.ingress.kubernetes.io/actions.weighted-routing: |
+      {"type":"forward","forwardConfig":{"targetGroups":[
+        {"serviceName":"model-server","servicePort":"80","weight":90},
+        {"serviceName":"model-candidate","servicePort":"80","weight":10}]}}
+spec:
+  ingressClassName: alb
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: weighted-routing
+                port:
+                  name: use-annotation

@@ -1,0 +1,33 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+
+# ACCOUNT_ID and tag are set by CI via `kustomize edit set image` after build-and-push-ecr
+images:
+  - name: ghcr.io/danial-umer710/rollbackops/model-server
+    newName: 123456789012.dkr.ecr.us-east-1.amazonaws.com/rollbackops/model-server
+    newTag: sha-REPLACE_ME
+  - name: ghcr.io/danial-umer710/rollbackops/drift-detector
+    newName: 123456789012.dkr.ecr.us-east-1.amazonaws.com/rollbackops/drift-detector
+    newTag: sha-REPLACE_ME
+  - name: ghcr.io/danial-umer710/rollbackops/rollback-controller
+    newName: 123456789012.dkr.ecr.us-east-1.amazonaws.com/rollbackops/rollback-controller
+    newTag: sha-REPLACE_ME
+
+patches:
+  - path: irsa-patch.yaml
+  - path: ingress-patch.yaml
+  # The nginx canary Ingress object has no ALB equivalent (the weighted-routing
+  # action on the main Ingress replaces it)
+  - target:
+      kind: Ingress
+      name: model-server-canary
+    patch: |-
+      $patch: delete
+      apiVersion: networking.k8s.io/v1
+      kind: Ingress
+      metadata:
+        name: model-server-canary
+        namespace: default

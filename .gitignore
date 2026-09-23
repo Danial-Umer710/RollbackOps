@@ -2,7 +2,7 @@ __pycache__/
 .pytest_cache/
 .venv/
 *.pyc
-k8s/rollback-controller/secret.yaml
+k8s/base/rollback-controller/secret.yaml
 .terragrunt-cache/
 .terragrunt-local-state/
 *.tfstate
