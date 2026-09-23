@@ -17,3 +17,4 @@ images:
 
 patches:
   - path: monitoring-nodeport-patch.yaml
+  - path: rollback-controller-strategy-patch.yaml

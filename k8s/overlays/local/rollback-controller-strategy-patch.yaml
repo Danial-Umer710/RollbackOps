@@ -1,0 +1,13 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rollback-controller
+  namespace: default
+spec:
+  template:
+    spec:
+      containers:
+        - name: rollback-controller
+          env:
+            - name: TRAFFIC_STRATEGY
+              value: "nginx"

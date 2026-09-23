@@ -17,6 +17,19 @@ tally_versions() {
   done | sort | uniq -c
 }
 
+echo "==> Checking rollback-controller strategy"
+kubectl -n default port-forward svc/rollback-controller 18002:8080 >/dev/null 2>&1 &
+RC_PF_PID=$!
+sleep 2
+STRATEGY_JSON=$(curl -sf http://localhost:18002/strategy)
+echo "    $STRATEGY_JSON"
+printf '%s' "$STRATEGY_JSON" | python -c '
+import json, sys
+s = json.load(sys.stdin)
+assert s["strategy"] == "nginx", f"expected nginx strategy, got {s}"
+'
+kill "$RC_PF_PID" >/dev/null 2>&1 || true
+
 echo "==> Restoring canary weight to 10"
 kubectl -n default annotate ingress model-server-canary \
   nginx.ingress.kubernetes.io/canary-weight=10 --overwrite
@@ -74,7 +87,7 @@ kubectl -n default get ingress model-server-canary -o json \
 import json, sys
 ann = json.load(sys.stdin)["metadata"]["annotations"]
 for k, v in sorted(ann.items()):
-    if k.startswith("rollbackops.io/") or "canary" in k:
+    if k.startswith("rollbackops.io/") or "canary" in k or "traffic-strategy" in k:
         print(f"  {k}: {v}")
 '
 

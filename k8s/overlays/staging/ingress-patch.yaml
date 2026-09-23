@@ -1,7 +1,7 @@
 # Requires the AWS Load Balancer Controller installed on the cluster.
-# Note: the rollback-controller currently patches nginx's canary-weight
-# annotation; on ALB the rollback strategy must instead rewrite the
-# actions.weighted-routing weights — tracked as a follow-up.
+# The rollback-controller runs with TRAFFIC_STRATEGY=alb here (see
+# rollback-controller-strategy-patch.yaml) and rolls back by rewriting
+# the actions.weighted-routing weights to 100/0.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:

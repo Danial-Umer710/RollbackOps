@@ -7,13 +7,18 @@ from fastapi.responses import JSONResponse
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from pydantic import BaseModel, ConfigDict
 
-from app.config import CANARY_INGRESS_NAME, CLUSTER_NAME, TARGET_NAMESPACE
+from app.config import CLUSTER_NAME, INGRESS_NAME, TARGET_NAMESPACE, TRAFFIC_STRATEGY
 from app.github import dispatch_audit_event
 from app.k8s import get_networking_api, rollback_canary
 from app.metrics import DISPATCHES_TOTAL, ROLLBACKS_TOTAL, WEBHOOKS_TOTAL
+from app.strategies import build_strategy
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
+
+# Built at import so an invalid TRAFFIC_STRATEGY crashes the pod at startup
+STRATEGY = build_strategy(TRAFFIC_STRATEGY, INGRESS_NAME)
+logger.info("traffic strategy=%s ingress=%s", STRATEGY.name, STRATEGY.ingress_name)
 
 app = FastAPI(title="RollbackOps Rollback Controller")
 
@@ -59,9 +64,7 @@ def webhook(payload: WebhookPayload):
     reason = f"{alert.labels.get('alertname')} model_version={model_version}"
 
     try:
-        result = rollback_canary(
-            get_api(), TARGET_NAMESPACE, CANARY_INGRESS_NAME, reason
-        )
+        result = rollback_canary(get_api(), TARGET_NAMESPACE, STRATEGY, reason)
     except Exception:
         logger.exception("rollback failed")
         ROLLBACKS_TOTAL.labels(result="error").inc()
@@ -77,7 +80,8 @@ def webhook(payload: WebhookPayload):
             "alertname": alert.labels.get("alertname"),
             "model_version": model_version,
             "namespace": TARGET_NAMESPACE,
-            "ingress": CANARY_INGRESS_NAME,
+            "ingress": STRATEGY.ingress_name,
+            "traffic_strategy": result["strategy"],
             "rollback_result": result["result"],
             "previous_weight": result["previous_weight"],
             "cluster": CLUSTER_NAME,
@@ -88,13 +92,23 @@ def webhook(payload: WebhookPayload):
         DISPATCHES_TOTAL.labels(result=dispatch).inc()
 
     logger.info(
-        "ROLLBACK result=%s model_version=%s previous_weight=%s dispatch=%s",
+        "ROLLBACK result=%s model_version=%s previous_weight=%s strategy=%s dispatch=%s",
         result["result"],
         model_version,
         result["previous_weight"],
+        result["strategy"],
         dispatch,
     )
     return {"handled": True, "rollback": result, "dispatch": dispatch}
+
+
+@app.get("/strategy")
+def strategy() -> dict:
+    return {
+        "strategy": STRATEGY.name,
+        "ingress": STRATEGY.ingress_name,
+        "namespace": TARGET_NAMESPACE,
+    }
 
 
 @app.get("/healthz")

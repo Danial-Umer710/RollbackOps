@@ -31,8 +31,6 @@ spec:
           env:
             - name: TARGET_NAMESPACE
               value: "default"
-            - name: CANARY_INGRESS_NAME
-              value: "model-server-canary"
             - name: GITHUB_REPO
               value: "Danial-Umer710/RollbackOps"
             - name: CLUSTER_NAME

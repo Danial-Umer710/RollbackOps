@@ -115,10 +115,23 @@ kind delete cluster --name rollbackops
 
 Architecture: `drift-detector` emits `model_drift_score` → Prometheus rule
 `ModelDriftDetected` (>0.6 for 1m) → Alertmanager →
-`rollback-controller` (`/webhook`) patches the `model-server-canary` Ingress
-`canary-weight` to `0` and fires a GitHub `repository_dispatch`
-(`drift_rollback_triggered`) → `.github/workflows/audit.yaml` records the audit.
+`rollback-controller` (`/webhook`) sends 100% of traffic to stable and fires a
+GitHub `repository_dispatch` (`drift_rollback_triggered`) →
+`.github/workflows/audit.yaml` records the audit.
 Alertmanager also mirrors every alert to `webhook-sink` for visibility.
+
+The controller supports two traffic strategies via env:
+
+- `TRAFFIC_STRATEGY=nginx` (default; local overlay sets it explicitly): patches
+  `nginx.ingress.kubernetes.io/canary-weight` to `0` on the canary Ingress.
+- `TRAFFIC_STRATEGY=alb` (staging overlay): rewrites the
+  `alb.ingress.kubernetes.io/actions.weighted-routing` target-group weights to
+  100/0 on the main Ingress.
+
+Related env: `INGRESS_NAME` (defaults per strategy — `model-server-canary` for
+nginx, `model-server` for alb), `STABLE_SERVICE`/`CANDIDATE_SERVICE`/
+`SERVICE_PORT` for the ALB target groups. `GET /strategy` reports the active
+strategy.
 
 Traffic reaches the models through ingress-nginx at http://localhost:8080
 (kind maps host 8080/8443 -> node 80/443). The canary Ingress sends

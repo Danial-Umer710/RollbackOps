@@ -1,3 +1,5 @@
+import json
+
 import pytest
 from fastapi.testclient import TestClient
 from kubernetes.client.exceptions import ApiException
@@ -5,6 +7,19 @@ from kubernetes.client.exceptions import ApiException
 import app.github as github_mod
 import app.main as main_mod
 from app.main import app
+from app.strategies import AlbWeightedStrategy, NginxCanaryStrategy
+
+ALB_ACTION = json.dumps(
+    {
+        "type": "forward",
+        "forwardConfig": {
+            "targetGroups": [
+                {"serviceName": "model-server", "servicePort": "80", "weight": 90},
+                {"serviceName": "model-candidate", "servicePort": "80", "weight": 10},
+            ]
+        },
+    }
+)
 
 
 class FakeIngressMetadata:
@@ -13,22 +28,26 @@ class FakeIngressMetadata:
 
 
 class FakeIngress:
-    def __init__(self, weight):
-        self.metadata = FakeIngressMetadata(
-            {"nginx.ingress.kubernetes.io/canary-weight": weight}
-        )
+    def __init__(self, weight, annotations=None):
+        if annotations is not None:
+            self.metadata = FakeIngressMetadata(annotations)
+        else:
+            self.metadata = FakeIngressMetadata(
+                {"nginx.ingress.kubernetes.io/canary-weight": weight}
+            )
 
 
 class FakeNetworkingApi:
-    def __init__(self, weight="10", raise_on_read=False):
+    def __init__(self, weight="10", annotations=None, raise_on_read=False):
         self.weight = weight
+        self.annotations = annotations
         self.raise_on_read = raise_on_read
         self.patch_calls = []
 
     def read_namespaced_ingress(self, name, namespace):
         if self.raise_on_read:
             raise ApiException(status=500, reason="boom")
-        return FakeIngress(self.weight)
+        return FakeIngress(self.weight, annotations=self.annotations)
 
     def patch_namespaced_ingress(self, name, namespace, body):
         self.patch_calls.append((name, namespace, body))
@@ -87,19 +106,53 @@ def test_resolved_alert_ignored(client, fake_api, dispatch_spy):
     assert fake_api.patch_calls == []
 
 
-def test_firing_alert_executes_rollback(client, fake_api, dispatch_spy):
+def test_firing_alert_executes_rollback_nginx(client, fake_api, dispatch_spy):
     resp = client.post("/webhook", json=_payload())
     assert resp.status_code == 200
     body = resp.json()
     assert body["handled"] is True
     assert body["rollback"]["result"] == "executed"
     assert body["rollback"]["previous_weight"] == "10"
+    assert body["rollback"]["strategy"] == "nginx"
     assert len(fake_api.patch_calls) == 1
     annotations = fake_api.patch_calls[0][2]["metadata"]["annotations"]
     assert annotations["nginx.ingress.kubernetes.io/canary-weight"] == "0"
     assert annotations["rollbackops.io/previous-canary-weight"] == "10"
+    assert annotations["rollbackops.io/traffic-strategy"] == "nginx"
     assert len(dispatch_spy) == 1
     assert dispatch_spy[0]["model_version"] == "v1.1.0-candidate"
+    assert dispatch_spy[0]["traffic_strategy"] == "nginx"
+
+
+def test_firing_alert_executes_rollback_alb(client, monkeypatch, dispatch_spy):
+    api = FakeNetworkingApi(
+        annotations={"alb.ingress.kubernetes.io/actions.weighted-routing": ALB_ACTION}
+    )
+    monkeypatch.setattr(main_mod, "get_api", lambda: api)
+    monkeypatch.setattr(
+        main_mod,
+        "STRATEGY",
+        AlbWeightedStrategy(
+            ingress_name="model-server",
+            stable_service="model-server",
+            candidate_service="model-candidate",
+            service_port="80",
+        ),
+    )
+    resp = client.post("/webhook", json=_payload())
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["rollback"]["result"] == "executed"
+    assert body["rollback"]["strategy"] == "alb"
+    annotations = api.patch_calls[0][2]["metadata"]["annotations"]
+    assert annotations["rollbackops.io/traffic-strategy"] == "alb"
+    action = json.loads(
+        annotations["alb.ingress.kubernetes.io/actions.weighted-routing"]
+    )
+    groups = action["forwardConfig"]["targetGroups"]
+    assert groups[0]["weight"] == 100
+    assert groups[1]["weight"] == 0
+    assert dispatch_spy[0]["traffic_strategy"] == "alb"
 
 
 def test_already_rolled_back(client, monkeypatch, dispatch_spy):

@@ -19,6 +19,7 @@ images:
 patches:
   - path: irsa-patch.yaml
   - path: ingress-patch.yaml
+  - path: rollback-controller-strategy-patch.yaml
   # The nginx canary Ingress object has no ALB equivalent (the weighted-routing
   # action on the main Ingress replaces it)
   - target:

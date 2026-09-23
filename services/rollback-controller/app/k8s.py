@@ -2,8 +2,6 @@ from datetime import datetime, timezone
 
 from kubernetes import client, config
 
-from app.config import CANARY_WEIGHT_ANNOTATION
-
 
 def get_networking_api() -> client.NetworkingV1Api:
     try:
@@ -13,25 +11,34 @@ def get_networking_api() -> client.NetworkingV1Api:
     return client.NetworkingV1Api()
 
 
-def rollback_canary(api, namespace: str, ingress_name: str, reason: str) -> dict:
-    ingress = api.read_namespaced_ingress(ingress_name, namespace)
-    current = (ingress.metadata.annotations or {}).get(CANARY_WEIGHT_ANNOTATION, "0")
-    if current == "0":
-        return {"result": "already_rolled_back", "previous_weight": "0"}
+def rollback_canary(api, namespace: str, strategy, reason: str) -> dict:
+    ingress = api.read_namespaced_ingress(strategy.ingress_name, namespace)
+    current = strategy.candidate_weight(ingress)
+    if current == 0:
+        return {
+            "result": "already_rolled_back",
+            "previous_weight": "0",
+            "strategy": strategy.name,
+        }
     api.patch_namespaced_ingress(
-        ingress_name,
+        strategy.ingress_name,
         namespace,
         {
             "metadata": {
                 "annotations": {
-                    CANARY_WEIGHT_ANNOTATION: "0",
+                    **strategy.rollback_patch(ingress),
                     "rollbackops.io/rolled-back-at": datetime.now(
                         timezone.utc
                     ).isoformat(),
                     "rollbackops.io/rollback-reason": reason,
-                    "rollbackops.io/previous-canary-weight": current,
+                    "rollbackops.io/previous-canary-weight": str(current),
+                    "rollbackops.io/traffic-strategy": strategy.name,
                 }
             }
         },
     )
-    return {"result": "executed", "previous_weight": current}
+    return {
+        "result": "executed",
+        "previous_weight": str(current),
+        "strategy": strategy.name,
+    }
